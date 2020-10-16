@@ -655,7 +655,7 @@ int main() {
 // old_init_adc();
 	init_adc();
 // select_pattern (AD9276_OUT_TEST_10_WORDTOG_VAL);
-	set_pattern(100, 0);
+	set_pattern(4096, 0);
 
 	alt_write_word(h2p_adc_start_pulselength_addr, 10);
 	alt_write_word(h2p_adc_samples_per_echo_addr, num_of_samples);

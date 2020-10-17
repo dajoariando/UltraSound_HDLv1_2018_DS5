@@ -39,9 +39,11 @@ void create_measurement_folder(char * foldertype) {
 	sprintf(command, "cp ./thesis_nmr_de1soc_hdl2.0 %s/execfile", foldername);
 	system(command);
 }
+
 void init() {
 
 	//printf("ULTRASOUND SYSTEM STARTS!\n");
+
 	// open device memory
 	fd_dev_mem = open("/dev/mem", O_RDWR | O_SYNC);
 	if (fd_dev_mem == -1) {
@@ -68,6 +70,7 @@ void init() {
 		close(fd_dev_mem);
 		exit (EXIT_FAILURE);
 	}
+
 	// h2p_fifo_sink_csr_addr = h2f_lw_axi_master + FIFO_SINK_OUT_CSR_BASE;
 	// h2p_fifo_sink_data_addr = h2f_lw_axi_master + FIFO_SINK_OUT_BASE;
 	h2p_fifo_sink_ch_a_csr_addr = h2f_lw_axi_master + FIFO_SINK_CH_A_OUT_CSR_BASE;
@@ -104,7 +107,9 @@ void init() {
 	h2p_lm96570_spi_in0_addr = h2f_lw_axi_master + LM96570_SPI_IN_0_BASE;
 	h2p_adc_start_pulselength_addr = h2f_lw_axi_master + ADC_START_PULSELENGTH_BASE;
 	h2p_mux_control_addr = h2f_lw_axi_master + MUX_CONTROL_BASE;
-// write default value for cnt_out
+	h2p_muxspi_addr = h2f_lw_axi_master + MUX_SPI_BASE;
+
+	// write default value for cnt_out
 	cnt_out_val = CNT_OUT_DEFAULT;
 	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
 }
@@ -161,6 +166,7 @@ void leave() {
 	h2p_lm96570_spi_in1_addr = NULL;
 	h2p_lm96570_spi_in0_addr = NULL;
 	h2p_mux_control_addr = NULL;
+	h2p_muxspi_addr = NULL;
 	//printf("\nULTRASOUND SYSTEM STOPS!\n");
 }
 
@@ -399,6 +405,8 @@ void print_data_bank(unsigned int data_bank[num_of_switches][num_of_channels][nu
 		for (jj = 0; jj < num_of_channels; jj++) {
 
 			for (kk = 0; kk < num_of_samples; kk++) {
+
+				//if (ii == 10 && jj == 7)
 				printf("%d ", data_bank[ii][jj][kk] & 0xFFF);
 			}
 			//fprintf(fptr, "\n");
@@ -406,84 +414,163 @@ void print_data_bank(unsigned int data_bank[num_of_switches][num_of_channels][nu
 		//fprintf(fptr, "\n");
 	}
 }
+
+void write_mux_spi(unsigned char muxdata) {
+	unsigned int data;
+
+	while (!(alt_read_word(h2p_muxspi_addr + SPI_STATUS_offst) & (1 << status_TRDY_bit)))
+		;
+	alt_write_word((h2p_muxspi_addr + SPI_TXDATA_offst), muxdata);
+	while (!(alt_read_word(h2p_muxspi_addr + SPI_STATUS_offst) & (1 << status_TMT_bit)))
+		;
+	data = alt_read_word(h2p_muxspi_addr + SPI_RXDATA_offst);   // wait for the spi command to finish
+}
+
+void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned int mux4, unsigned int mux5, unsigned int mux6) {
+	// REMEMBER THAT THE HV SIGNAL MUST BE OFF WHENEVER THIS CODE IS CALLED, OTHERWISE THE CHIP WILL IGNORE IT
+
+	// disable all control signal
+	// cnt_out_val &= ~MUX_SET_msk;	// disable set
+	cnt_out_val &= ~MUX_CLR_MSK;	// disable clear
+	cnt_out_val |= MUX_LE_MSK;		// set LE high to prevent output change
+	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
+	usleep(100);
+
+	write_mux_spi((mux1 >> 8) & 0xFF);
+	write_mux_spi(mux1 & 0xFF);
+	write_mux_spi((mux2 >> 8) & 0xFF);
+	write_mux_spi(mux2 & 0xFF);
+	write_mux_spi((mux3 >> 8) & 0xFF);
+	write_mux_spi(mux3 & 0xFF);
+	write_mux_spi((mux4 >> 8) & 0xFF);
+	write_mux_spi(mux4 & 0xFF);
+	write_mux_spi((mux5 >> 8) & 0xFF);
+	write_mux_spi(mux5 & 0xFF);
+	write_mux_spi((mux6 >> 8) & 0xFF);
+	write_mux_spi(mux6 & 0xFF);
+
+	cnt_out_val &= ~MUX_LE_MSK;		// set LE low to update output
+	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
+	usleep(100);
+
+	cnt_out_val |= MUX_LE_MSK;		// set LE high after finishing update
+	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
+	usleep(100);
+
+}
+
+// int main(int argc, char * argv[]) {
 int main() {
-// Initialize system
+	// unsigned int mux1val = atoi(argv[1]);
+	// unsigned int mux2val = atoi(argv[2]);
+	// unsigned int mux3val = atoi(argv[3]);
+	// unsigned int mux4val = atoi(argv[4]);
+	// unsigned int mux5val = atoi(argv[5]);
+	// unsigned int mux6val = atoi(argv[6]);
+
+	// Initialize system
 	init();
 	read_adc_id();
 	init_beamformer();
 	init_adc();
 	alt_write_word(h2p_adc_start_pulselength_addr, 10);
 	alt_write_word(h2p_adc_samples_per_echo_addr, num_of_samples);
+
+	// SETTINGS FOR MUX
+	// disable all mux signal
+	cnt_out_val &= ~MUX_SET_MSK;
+	cnt_out_val &= ~MUX_CLR_MSK;
+	cnt_out_val |= MUX_LE_MSK;
+	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
+	usleep(100);
+
+	// set mux
+	// wr_14866(mux1val, mux2val, mux3val, mux4val, mux5val, mux6val);
+	wr_14866(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF);
+
 	unsigned int data_bank[num_of_switches][num_of_channels][num_of_samples];
 	unsigned int adc_data[num_of_samples];   // data for 1 acquisition
 	unsigned int sw_num = 0;
-	for (sw_num = 0; sw_num < num_of_switches; sw_num++) {
-		//Reset FSM in order to address glitching
-		cnt_out_val |= FSM_RST_MSK;
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// restart the Ultrasound FSM
-		usleep(1000);
-		cnt_out_val &= (~FSM_RST_MSK);
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// set the Ultrasound FSM
-		usleep(1000);
-		//write mux
-		alt_write_word(h2p_mux_control_addr, ((0x00) & 0x7FF));
-		usleep(500);
-		alt_write_word(h2p_mux_control_addr, ((1 << sw_num) & 0x7FF));
+	//for (sw_num = 0; sw_num < num_of_switches; sw_num++) {
+	//Reset FSM in order to address glitching
+	cnt_out_val |= FSM_RST_MSK;
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+	// restart the Ultrasound FSM
+	usleep(1000);
+	cnt_out_val &= (~FSM_RST_MSK);
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+	// set the Ultrasound FSM
+	usleep(1000);
+	//write mux
+	alt_write_word(h2p_mux_control_addr, ((0x00) & 0x7FF));
+	usleep(500);
+	alt_write_word(h2p_mux_control_addr, ((1 << sw_num) & 0x7FF));
 
-		init_beamformer();
-		usleep(500);
-		// tx_path on
-		//cnt_out_val |= tx_path_en_MSK;
-		//alt_write_word( h2p_general_cnt_out_addr , cnt_out_val);
-		// start the beamformer SPI
-		//usleep(100000);
-		// sw_off on
-		//cnt_out_val |= sw_off_MSK;
-		//alt_write_word( h2p_general_cnt_out_addr , cnt_out_val);
-		// start the beamformer SPI
-		//usleep(100000);
-		// pulser on
-		cnt_out_val |= pulser_en_MSK;
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// start the beamformer SPI
-		usleep(1000);
-		// tx_enable fire
-		cnt_out_val |= lm96570_tx_en_MSK;
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// start the beamformer SPI
-		usleep(1000);
-		cnt_out_val &= (~lm96570_tx_en_MSK);
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// stop the beamformer SPI
-		// pulser off
-		//usleep(200000);
-		cnt_out_val &= (~pulser_en_MSK);
-		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
-		// stop the beamformer SPI
-		read_adc_val(h2p_fifo_sink_ch_a_csr_addr, h2p_fifo_sink_ch_a_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 0, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_b_csr_addr, h2p_fifo_sink_ch_b_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 1, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_c_csr_addr, h2p_fifo_sink_ch_c_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 2, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_d_csr_addr, h2p_fifo_sink_ch_d_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 3, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_e_csr_addr, h2p_fifo_sink_ch_e_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 4, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_f_csr_addr, h2p_fifo_sink_ch_f_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 5, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_g_csr_addr, h2p_fifo_sink_ch_g_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 6, num_of_samples);
-		read_adc_val(h2p_fifo_sink_ch_h_csr_addr, h2p_fifo_sink_ch_h_data_addr, adc_data);
-		store_data(adc_data, data_bank, sw_num, 7, num_of_samples);
-		//printf("Completed Event: %d\n",sw_num);
-	}
+	init_beamformer();
+	usleep(500);
+
+	// tx_path on
+	//cnt_out_val |= tx_path_en_MSK;
+	//alt_write_word( h2p_general_cnt_out_addr , cnt_out_val);
+
+	// start the beamformer SPI
+	//usleep(100000);
+
+	// sw_off on
+	//cnt_out_val |= sw_off_MSK;
+	//alt_write_word( h2p_general_cnt_out_addr , cnt_out_val);
+
+	// start the beamformer SPI
+	//usleep(100000);
+
+	// pulser on
+	cnt_out_val |= pulser_en_MSK;
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+
+	// start the beamformer SPI
+	usleep(1000);
+
+	// tx_enable fire
+	cnt_out_val |= lm96570_tx_en_MSK;
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+
+	// start the beamformer SPI
+	usleep(1000);
+	cnt_out_val &= (~lm96570_tx_en_MSK);
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+
+	// stop the beamformer SPI
+	// pulser off
+	//usleep(200000);
+	cnt_out_val &= (~pulser_en_MSK);
+	alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
+
+	// stop the beamformer SPI
+	read_adc_val(h2p_fifo_sink_ch_a_csr_addr, h2p_fifo_sink_ch_a_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 0, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_b_csr_addr, h2p_fifo_sink_ch_b_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 1, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_c_csr_addr, h2p_fifo_sink_ch_c_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 2, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_d_csr_addr, h2p_fifo_sink_ch_d_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 3, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_e_csr_addr, h2p_fifo_sink_ch_e_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 4, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_f_csr_addr, h2p_fifo_sink_ch_f_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 5, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_g_csr_addr, h2p_fifo_sink_ch_g_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 6, num_of_samples);
+	read_adc_val(h2p_fifo_sink_ch_h_csr_addr, h2p_fifo_sink_ch_h_data_addr, adc_data);
+	store_data(adc_data, data_bank, sw_num, 7, num_of_samples);
+	//printf("Completed Event: %d\n",sw_num);
+	//}
+
 	write_data_bank(data_bank);
 	print_data_bank(data_bank);
+
 	// exit program
 	leave();
+
 	//printf("%s \n",data_bank);
 	return 0;
 }

@@ -426,7 +426,7 @@ void write_mux_spi(unsigned char muxdata) {
 	data = alt_read_word(h2p_muxspi_addr + SPI_RXDATA_offst);   // wait for the spi command to finish
 }
 
-void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned int mux4, unsigned int mux5, unsigned int mux6) {
+void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned int mux4, unsigned int mux5) {
 	// REMEMBER THAT THE HV SIGNAL MUST BE OFF WHENEVER THIS CODE IS CALLED, OTHERWISE THE CHIP WILL IGNORE IT
 
 	// disable all control signal
@@ -446,8 +446,6 @@ void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned 
 	write_mux_spi(mux4 & 0xFF);
 	write_mux_spi((mux5 >> 8) & 0xFF);
 	write_mux_spi(mux5 & 0xFF);
-	write_mux_spi((mux6 >> 8) & 0xFF);
-	write_mux_spi(mux6 & 0xFF);
 
 	cnt_out_val &= ~MUX_LE_MSK;		// set LE low to update output
 	alt_write_word((h2p_general_cnt_out_addr), cnt_out_val);
@@ -461,12 +459,11 @@ void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned 
 
 // int main(int argc, char * argv[]) {
 int main() {
-	// unsigned int mux1val = atoi(argv[1]);
-	// unsigned int mux2val = atoi(argv[2]);
-	// unsigned int mux3val = atoi(argv[3]);
-	// unsigned int mux4val = atoi(argv[4]);
-	// unsigned int mux5val = atoi(argv[5]);
-	// unsigned int mux6val = atoi(argv[6]);
+	//unsigned int mux1val = atoi(argv[1]);
+	//unsigned int mux2val = atoi(argv[2]);
+	//unsigned int mux3val = atoi(argv[3]);
+	//unsigned int mux4val = atoi(argv[4]);
+	//unsigned int mux5val = atoi(argv[5]);
 
 	// Initialize system
 	init();
@@ -485,8 +482,9 @@ int main() {
 	usleep(100);
 
 	// set mux
-	// wr_14866(mux1val, mux2val, mux3val, mux4val, mux5val, mux6val);
-	wr_14866(0x0000, 0x00, 0x00, 0x00, 0x00, 0x00);
+
+	//wr_14866(mux1val, mux2val, mux3val, mux4val, mux5val);
+	wr_14866(0x0000, 0x00, 0x00, 0x00, 0x00);
 
 	unsigned int data_bank[num_of_switches][num_of_channels][num_of_samples];
 	unsigned int adc_data[num_of_samples];   // data for 1 acquisition
@@ -496,51 +494,51 @@ int main() {
 		switch (sw_num) {
 
 		case 0:
-			wr_14866(0xFF00, 0x00, 0x00, 0x00, 0x00, 0x00);
+			wr_14866(0x00FF, 0x00, 0x00, 0x00, 0x00);
 			break;
 
 		case 1:
-			wr_14866(0x00FF, 0x00, 0x00, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0xFF00, 0x00, 0x00, 0x00);
 			break;
 
 		case 2:
-			wr_14866(0x00, 0xFF00, 0x00, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0x00FF, 0x00, 0x00, 0x00);
 			break;
 
 		case 3:
-			wr_14866(0x00, 0x00FF, 0x00, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0xFF00, 0x00, 0x00);
 			break;
 
 		case 4:
-			wr_14866(0x00, 0x00, 0xFF00, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0x00FF, 0x00, 0x00);
 			break;
 
 		case 5:
-			wr_14866(0x00, 0x00, 0x00FF, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0xFF00, 0x00);
 			break;
 
 		case 6:
-			wr_14866(0x00, 0x00, 0x00, 0xFF00, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0x00FF, 0x00);
 			break;
 
 		case 7:
-			wr_14866(0x00, 0x00, 0x00, 0x00FF, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0x00, 0xFF00);
 			break;
 
 		case 8:
-			wr_14866(0x00, 0x00, 0x00, 0x00, 0xFF00, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00FF);
 			break;
 
 		case 9:
-			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00FF, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00);
 			break;
 
 		case 10:
-			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00, 0xFF00);
+			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00);
 			break;
 
 		default:
-			wr_14866(0x00FF, 0x00, 0x00, 0x00, 0x00, 0x00);
+			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00);
 		}
 
 		//Reset FSM in order to address glitching
@@ -623,9 +621,9 @@ int main() {
 	write_data_bank(data_bank);
 	print_data_bank(data_bank);
 
-	// exit program
+// exit program
 	leave();
 
-	//printf("%s \n",data_bank);
+//printf("%s \n",data_bank);
 	return 0;
 }

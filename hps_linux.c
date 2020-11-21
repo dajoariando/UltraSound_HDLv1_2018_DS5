@@ -457,13 +457,13 @@ void wr_14866(unsigned int mux1, unsigned int mux2, unsigned int mux3, unsigned 
 
 }
 
-// int main(int argc, char * argv[]) {
-int main() {
-	//unsigned int mux1val = atoi(argv[1]);
-	//unsigned int mux2val = atoi(argv[2]);
-	//unsigned int mux3val = atoi(argv[3]);
-	//unsigned int mux4val = atoi(argv[4]);
-	//unsigned int mux5val = atoi(argv[5]);
+int main(int argc, char * argv[]) {
+// int main() {
+	unsigned int mux1val = atoi(argv[1]);
+	unsigned int mux2val = atoi(argv[2]);
+	unsigned int mux3val = atoi(argv[3]);
+	unsigned int mux4val = atoi(argv[4]);
+	unsigned int mux5val = atoi(argv[5]);
 
 	// Initialize system
 	init();
@@ -483,12 +483,15 @@ int main() {
 
 	// set mux
 
-	//wr_14866(mux1val, mux2val, mux3val, mux4val, mux5val);
-	wr_14866(0x0000, 0x00, 0x00, 0x00, 0x00);
+	wr_14866(mux1val, mux2val, mux3val, mux4val, mux5val);
+	// wr_14866(0x0000, 0x00, 0x00, 0x00, 0x00);
+
 
 	unsigned int data_bank[num_of_switches][num_of_channels][num_of_samples];
 	unsigned int adc_data[num_of_samples];   // data for 1 acquisition
 	unsigned int sw_num = 0;
+
+	/*
 	for (sw_num = 0; sw_num < num_of_switches; sw_num++) {
 
 		switch (sw_num) {
@@ -540,6 +543,7 @@ int main() {
 		default:
 			wr_14866(0x00, 0x00, 0x00, 0x00, 0x00);
 		}
+	*/
 
 		//Reset FSM in order to address glitching
 		cnt_out_val |= FSM_RST_MSK;
@@ -556,7 +560,7 @@ int main() {
 		//write mux
 		alt_write_word(h2p_mux_control_addr, ((0x00) & 0x7FF));
 		usleep(500);
-		alt_write_word(h2p_mux_control_addr, ((1 << sw_num) & 0x7FF));
+		// alt_write_word(h2p_mux_control_addr, ((1 << sw_num) & 0x7FF));
 
 		init_beamformer();
 		usleep(500);
@@ -597,6 +601,7 @@ int main() {
 		cnt_out_val &= (~pulser_en_MSK);
 		alt_write_word(h2p_general_cnt_out_addr, cnt_out_val);
 
+
 		// stop the beamformer SPI
 		read_adc_val(h2p_fifo_sink_ch_a_csr_addr, h2p_fifo_sink_ch_a_data_addr, adc_data);
 		store_data(adc_data, data_bank, sw_num, 0, num_of_samples);
@@ -616,7 +621,8 @@ int main() {
 		store_data(adc_data, data_bank, sw_num, 7, num_of_samples);
 		//printf("Completed Event: %d\n",sw_num);
 
-	}
+
+	//}
 
 	write_data_bank(data_bank);
 	print_data_bank(data_bank);

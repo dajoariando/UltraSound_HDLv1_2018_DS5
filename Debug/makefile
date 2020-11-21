@@ -22,19 +22,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: ultrasound_2018_pcb_v1
+all: ultrasound
 
 # Tool invocations
-ultrasound_2018_pcb_v1: $(OBJS) $(USER_OBJS)
+ultrasound: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker 4 [arm-linux-gnueabihf]'
-	arm-linux-gnueabihf-gcc  -o "ultrasound_2018_pcb_v1" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-linux-gnueabihf-gcc  -o "ultrasound" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES) $(OBJS) $(C_DEPS) ultrasound_2018_pcb_v1 
+	-$(RM) $(EXECUTABLES) $(OBJS) $(C_DEPS) ultrasound 
 	-@echo ' '
 
 .PHONY: all clean dependents
